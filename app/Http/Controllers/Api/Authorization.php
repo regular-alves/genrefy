@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
+use App\Models\SpotifyUser;
+use App\Providers\SpotifyUserProvider;
 
 class Authorization extends Controller
 {
@@ -28,5 +30,61 @@ class Authorization extends Controller
     public function return(Request $request)
     {
         return $request;
+    }
+
+    public function register(Request $request)
+    {
+        $data = $request->all();
+
+        $spotify_user = SpotifyUser::firstOrCreate([
+            'authorization' => $data['code']
+        ]);
+
+        if (!$spotify_user) {
+            return response()->json('Error on saving', 400);
+        }
+
+        if (!$spotify_user->token) {
+            $tokens = SpotifyUserProvider::getTokens($spotify_user);
+
+            if (isset($tokens['error']))
+                return response()->json($tokens, 400);
+
+            $spotify_user->fill([
+                'token' => $tokens['access_token'],
+                'refresh_token' => $tokens['refresh_token'],
+            ]);
+
+            if (!$spotify_user->save())
+                return response()->json('Error on saving', 400);
+        }
+
+        $user = SpotifyUserProvider::get($spotify_user);
+
+        if (isset($user['error'])) {
+            return response()->json($user, 400);
+        }
+
+        $another = SpotifyUser::where('spotify_id', $user['id'])->first();
+
+        if ($another) {
+            $another->fill([
+                'authorization' => $data['code'],
+                'token' => $spotify_user->token,
+                'refresh_token' => $spotify_user->refresh_token,
+            ]);
+
+            $another->save();
+            $spotify_user->delete();
+            $spotify_user = $another;
+        } else {
+            $spotify_user->fill([
+                'spotify_id' => $user['id']
+            ]);
+
+            $spotify_user->save();
+        }
+
+        return response()->json($spotify_user, 200);
     }
 }
