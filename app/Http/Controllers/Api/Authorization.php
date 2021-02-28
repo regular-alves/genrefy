@@ -36,7 +36,7 @@ class Authorization extends Controller
     {
         $data = $request->all();
 
-        $spotify_user = SpotifyUser::firstOrCreate([
+        $spotify_user = SpotifyUser::firstOrNew([
             'authorization' => $data['code']
         ]);
 
@@ -47,8 +47,8 @@ class Authorization extends Controller
         if (!$spotify_user->token) {
             $tokens = SpotifyUserProvider::getTokens($spotify_user);
 
-            if (isset($tokens['error']))
-                return response()->json($tokens, 400);
+            if (!$tokens || isset($tokens['error']))
+                return response()->json('Error to get token', 400);
 
             $spotify_user->fill([
                 'token' => $tokens['access_token'],
@@ -65,24 +65,26 @@ class Authorization extends Controller
             return response()->json($user, 400);
         }
 
-        $another = SpotifyUser::where('spotify_id', $user['id'])->first();
+        if (!$spotify_user->spotify_id) {
+            $another = SpotifyUser::where('spotify_id', $user['id'])->first();
 
-        if ($another) {
-            $another->fill([
-                'authorization' => $data['code'],
-                'token' => $spotify_user->token,
-                'refresh_token' => $spotify_user->refresh_token,
-            ]);
+            if ($another) {
+                $another->fill([
+                    'authorization' => $data['code'],
+                    'token' => $spotify_user->token,
+                    'refresh_token' => $spotify_user->refresh_token,
+                ]);
 
-            $another->save();
-            $spotify_user->delete();
-            $spotify_user = $another;
-        } else {
-            $spotify_user->fill([
-                'spotify_id' => $user['id']
-            ]);
+                $another->save();
+                $spotify_user->delete();
+                $spotify_user = $another;
+            } else {
+                $spotify_user->fill([
+                    'spotify_id' => $user['id']
+                ]);
 
             $spotify_user->save();
+        }
         }
 
         return response()->json($spotify_user, 200);

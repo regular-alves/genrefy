@@ -38,12 +38,11 @@ class SpotifyUserProvider extends ServiceProvider
                 env('SPOTIFY_CLIENT_ID'),
                 env('SPOTIFY_CLIENT_SECRET')
             )
-            ->post('https://accounts.spotify.com/api/token', [
+            ->post(env('SPOTIFY_ACCOUNT') . 'api/token', [
                 'grant_type' => 'authorization_code',
                 'code' => $user->authorization,
                 'redirect_uri' => env('APP_URL') . '/api/register/authorization'
-            ])
-            ->json();
+            ])->json();
     }
 
     static function get(SpotifyUser $user)
@@ -53,7 +52,7 @@ class SpotifyUserProvider extends ServiceProvider
 
         return Http::asForm()
             ->withToken($user->token)
-            ->get('https://api.spotify.com/v1/me')
+            ->get(env('SPOTIFY_API') . 'v1/me')
             ->json();
     }
 
@@ -67,7 +66,7 @@ class SpotifyUserProvider extends ServiceProvider
                 env('SPOTIFY_CLIENT_ID'),
                 env('SPOTIFY_CLIENT_SECRET')
             )
-            ->post('https://accounts.spotify.com/api/token', [
+            ->post(env('SPOTIFY_ACCOUNT') . 'api/token', [
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $user->refresh_token
             ])
